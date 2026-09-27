@@ -1,0 +1,15 @@
+# Optional local PostgreSQL for development. Production should use a managed
+# instance (Supabase / Railway / Neon) and set backend DATABASE_URL accordingly.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mr_rokesh_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

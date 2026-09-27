@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String
+  passwordHash       String?
+  role               UserRole            @default(EMPLOYEE)
+  active             Boolean             @default(true)
+  // Lockout after repeated failed password / TOTP / recovery attempts
+  failedAttempts     Int                 @default(0)
+  lockedUntil        DateTime?
+  devices            Device[]
+  auditLogs          AuditLog[]
+  refreshTokens      RefreshToken[]
+  enrollmentSessions EnrollmentSession[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model Device {
+  id            String           @id @default(uuid())
+  employeeId    String
+  employee      Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  deviceName    String?
+  pushToken     String?
+  // "fcm" (Android native FCM token) or "apns" (iOS native APNs token)
+  pushPlatform  String?
+  publicKey     String // base64 Ed25519 public key (32 bytes)
+  keyAlgorithm  String           @default("Ed25519")
+  totpSecret    String // AES-256-GCM encrypted base32 secret
+  // Last accepted TOTP time-step; blocks replay of a code inside its window
+  lastTotpStep  Int?
+  revoked       Boolean          @default(false)
+  recoveryCodes RecoveryCode[]
+  challenges    LoginChallenge[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  revokedAt     DateTime?
+
+  @@index([employeeId])
+  @@index([revoked])
+}
+
+model RecoveryCode {
+  id        String    @id @default(uuid())
+  deviceId  String
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  codeHash  String
+  used      Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([deviceId])
+}
+
+model LoginChallenge {
+  id          String          @id @default(uuid())
+  deviceId    String
+  device      Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  nonce       String          @unique
+  status      ChallengeStatus @default(PENDING)
+  // Context shown to the employee on the approval screen
+  application String?
+  requestIp   String?
+  expiresAt   DateTime
+  createdAt   DateTime        @default(now())
+  respondedAt DateTime?
+
+  @@index([deviceId])
+  @@index([expiresAt])
+}
+
+// Short-lived, single-use enrollment session created by an admin.
+// Only the SHA-256 of the enrollment token is stored.
+model EnrollmentSession {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  totpSecret String // AES-256-GCM encrypted; moved onto the Device on completion
+  createdBy  String // admin employee id
+  expiresAt  DateTime
+  usedAt     DateTime?
+  deviceId   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId])
+  @@index([expiresAt])
+}
+
+// Rotating refresh tokens; only the SHA-256 hash is stored.
+model RefreshToken {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  action     AuditAction
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([employeeId])
+  @@index([createdAt])
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum ChallengeStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+enum AuditAction {
+  APPROVE
+  DENY
+  ENROLL
+  REVOKE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  LOCKOUT
+  RECOVERY_CODE_USED
+  RECOVERY_FAILED
+  TOTP_VERIFIED
+  TOTP_FAILED
+  LOGIN_REQUEST
+  CREATE_EMPLOYEE
+  UPDATE_EMPLOYEE
+  CREATE_ENROLLMENT_SESSION
+}
