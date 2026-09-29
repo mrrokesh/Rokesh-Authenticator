@@ -128,3 +128,12 @@ For production: set `NODE_ENV=production` and `TRUST_PROXY=1` (or your proxy hop
 ```bash
 cd backend && npm test       # RFC 6238 vectors, ±1 window, AES-GCM tamper, Ed25519 domain separation, recovery codes
 ```
+
+End-to-end, against a running API on a **development** database (it creates throwaway employees, then locks and revokes them):
+
+```bash
+cd backend
+E2E_API_URL=http://localhost:4000 E2E_ADMIN_EMAIL=you@company.com E2E_ADMIN_PASSWORD=... npm run test:e2e
+```
+
+It plays the admin, the phone (real Ed25519 keys) and a company system. It covers enrollment, signed approve/deny, tampering, stale timestamps, replay, TOTP replay, recovery codes, refresh-token reuse, revocation, lockout and audit-log contents. `COMPANY_API_KEY` is read from `backend/.env`. Add `E2E_SLOW=1` to also wait out a real 60-second challenge expiry.
