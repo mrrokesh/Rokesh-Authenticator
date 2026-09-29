@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AppState, View } from 'react-native';
+import { useEffect } from 'react';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EnrollmentProvider, useEnrollment } from '../components/EnrollmentContext';
-import { Banner, Body, Button, Screen, Title } from '../components/ui';
+import { LockGate } from '../components/LockGate';
 import { useTheme } from '../components/theme';
 import { challengeIdFrom, registerForPush, toRegistration } from '../services/push';
 import { updatePushToken } from '../services/api';
-import { confirmUserPresence } from '../services/biometrics';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -19,56 +17,6 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-
-/** Re-locks the app after it has been in the background this long. */
-const RELOCK_AFTER_MS = 60_000;
-
-function LockGate({ children }: { children: ReactNode }) {
-  const { enrollment, loading } = useEnrollment();
-  const [unlocked, setUnlocked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const backgroundedAt = useRef<number | null>(null);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') backgroundedAt.current = Date.now();
-      if (state === 'active' && backgroundedAt.current && Date.now() - backgroundedAt.current > RELOCK_AFTER_MS) {
-        setUnlocked(false);
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
-  const unlock = useCallback(() => {
-    confirmUserPresence('Unlock MR ROKESH Authenticator')
-      .then((ok) => {
-        if (!ok) return;
-        setError(null);
-        setUnlocked(true);
-      })
-      .catch((err) => setError((err as Error).message));
-  }, []);
-
-  // Prompt automatically on launch and whenever the app re-locks.
-  useEffect(() => {
-    if (enrollment && !unlocked) unlock();
-  }, [enrollment, unlocked, unlock]);
-
-  if (loading) return <View style={{ flex: 1 }} />;
-  // Nothing sensitive to protect before enrollment.
-  if (!enrollment || unlocked) return <>{children}</>;
-
-  return (
-    <Screen scroll={false}>
-      <View style={{ flex: 1, justifyContent: 'center', gap: 16 }}>
-        <Title>Locked</Title>
-        <Body muted>Verify it’s you to view codes and approve sign-ins.</Body>
-        {error && <Banner>{error}</Banner>}
-        <Button label="Unlock" onPress={unlock} />
-      </View>
-    </Screen>
-  );
-}
 
 /** Routes notification taps to the approval screen and keeps the push token fresh. */
 function PushBridge() {

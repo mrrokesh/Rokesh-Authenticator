@@ -5,6 +5,7 @@ import { useEnrollment } from '../components/EnrollmentContext';
 import { Banner, Body, Button, Card, Screen, Title } from '../components/ui';
 import { getDeviceInfo, type DeviceInfo } from '../services/api';
 import { API_URL } from '../services/config';
+import { PushSettingsCard } from '../components/PushSettingsCard';
 
 export default function Settings() {
   const { enrollment, reset } = useEnrollment();
@@ -46,6 +47,7 @@ export default function Settings() {
         <Body muted>Server: {API_URL}</Body>
       </Card>
       {error && <Banner tone="warning">{error}</Banner>}
+      <PushSettingsCard />
       <Button label="Remove from this phone" variant="danger" onPress={removeDevice} />
     </Screen>
   );

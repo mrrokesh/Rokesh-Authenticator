@@ -6,6 +6,7 @@ import { useEnrollment } from '../components/EnrollmentContext';
 import { TotpCard } from '../components/TotpCard';
 import { Banner, Body, Button, Card, Screen, Title } from '../components/ui';
 import { useTheme } from '../components/theme';
+import { pushNeedsAttention, usePushStatus } from '../components/usePushStatus';
 import { ApiError, getDeviceInfo, listPendingChallenges, type Challenge } from '../services/api';
 
 const POLL_MS = 5000;
@@ -36,6 +37,8 @@ function Enrolled() {
   const [pending, setPending] = useState<Challenge[]>([]);
   const [revoked, setRevoked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const push = usePushStatus();
+  const { recheck: recheckPush } = push;
 
   const refresh = useCallback(async () => {
     try {
@@ -54,9 +57,10 @@ function Enrolled() {
         if (err instanceof ApiError && err.code === 'DEVICE_REVOKED') setRevoked(true);
       });
       refresh();
+      recheckPush(); // picks up changes made on the Settings screen
       const id = setInterval(refresh, POLL_MS);
       return () => clearInterval(id);
-    }, [refresh]),
+    }, [refresh, recheckPush]),
   );
 
   // Refresh immediately when a push arrives in the foreground.
@@ -85,6 +89,12 @@ function Enrolled() {
         </Banner>
       )}
       {error && <Banner tone="warning">{error}</Banner>}
+      {!revoked && pushNeedsAttention(push.status) && (
+        <Card>
+          <Body>Notifications are off, so you’ll only see sign-in requests while this app is open.</Body>
+          <Button variant="secondary" label="Fix in Settings" onPress={() => router.push('/settings')} />
+        </Card>
+      )}
 
       {pending.map((c) => (
         <Card key={c.id} style={{ borderColor: t.accent, borderWidth: 2 }}>

@@ -11,6 +11,8 @@ export async function deviceMe(req: Request, res: Response) {
     select: {
       id: true,
       deviceName: true,
+      pushToken: true,
+      pushPlatform: true,
       createdAt: true,
       employee: { select: { name: true, email: true } },
       _count: { select: { recoveryCodes: { where: { used: false } } } },
@@ -20,6 +22,9 @@ export async function deviceMe(req: Request, res: Response) {
     deviceId: device.id,
     deviceName: device.deviceName,
     enrolledAt: device.createdAt,
+    // Whether the server can currently push to this device (the token itself is not echoed back).
+    pushRegistered: !!device.pushToken,
+    pushPlatform: device.pushPlatform,
     employee: device.employee,
     unusedRecoveryCodes: device._count.recoveryCodes,
   });

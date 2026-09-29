@@ -98,13 +98,44 @@ async function main() {
     return call('GET', path, undefined, { 'X-Device-Id': deviceId, 'X-Device-Timestamp': String(ts), 'X-Device-Signature': sign(requestMessage('GET', path, ts, '')) });
   };
   check('device /me with signature 200', (await signedGet('/api/device/me')).status === 200);
+  check('device /me reports no push token yet', (await signedGet('/api/device/me')).body.pushRegistered === false);
+  const pushBody = JSON.stringify({ pushToken: 'fcm-e2e-token-0123456789', pushPlatform: 'fcm' });
+  const pts = Date.now();
+  const pushReg = await fetch(`${API}/api/device/push-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Id': deviceId,
+      'X-Device-Timestamp': String(pts),
+      'X-Device-Signature': sign(requestMessage('POST', '/api/device/push-token', pts, pushBody)),
+    },
+    body: pushBody,
+  });
+  check('signed POST push-token 204 (body hash verified)', pushReg.status === 204);
+  const tampered = await fetch(`${API}/api/device/push-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Id': deviceId,
+      'X-Device-Timestamp': String(pts),
+      'X-Device-Signature': sign(requestMessage('POST', '/api/device/push-token', pts, pushBody)),
+    },
+    body: pushBody.replace('fcm-e2e', 'fcm-evil'),
+  });
+  check('push-token with altered body rejected', tampered.status === 401);
+  const me = (await signedGet('/api/device/me')).body;
+  check('device /me reports push registered (fcm)', me.pushRegistered === true && me.pushPlatform === 'fcm', me);
   check('device /me with bad signature 401', (await call('GET', '/api/device/me', undefined, { 'X-Device-Id': deviceId, 'X-Device-Timestamp': String(Date.now()), 'X-Device-Signature': sign('nope') })).status === 401);
 
   console.log('Push login approval');
   check('login-request without API key 401', (await call('POST', '/api/auth/login-request', { email: aliceEmail })).status === 401);
   const lr = await call('POST', '/api/auth/login-request', { email: aliceEmail, application: 'Payroll', requestIp: '203.0.113.7' }, K);
   check('login-request 201', lr.status === 201, lr.body);
-  check('undelivered push is reported, not faked', lr.body.pushDelivered === false && lr.body.pushError === 'no_push_token', lr.body);
+  check(
+    'undelivered push is reported, not faked',
+    lr.body.pushDelivered === false && /^(not_configured: FIREBASE_SERVICE_ACCOUNT_BASE64|messaging\/)/.test(lr.body.pushError),
+    lr.body,
+  );
   const pending = await signedGet('/api/device/challenges');
   const ch = pending.body.challenges?.[0];
   check('device sees pending challenge', ch?.id === lr.body.challengeId, pending.body);

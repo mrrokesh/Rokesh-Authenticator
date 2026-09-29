@@ -35,6 +35,21 @@ export async function registerForPush(): Promise<PushRegistration | null> {
   return toRegistration(token);
 }
 
+export interface PushPermission {
+  /** False on simulators/emulators, which can't receive remote push. */
+  supported: boolean;
+  granted: boolean;
+  /** False once the user has permanently denied — only the OS settings app can re-enable it. */
+  canAskAgain: boolean;
+}
+
+export async function getPushPermission(): Promise<PushPermission> {
+  if (!Device.isDevice) return { supported: false, granted: false, canAskAgain: false };
+  const p = await Notifications.getPermissionsAsync();
+  const granted = p.granted || p.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+  return { supported: true, granted, canAskAgain: p.canAskAgain };
+}
+
 export function toRegistration(token: Notifications.DevicePushToken): PushRegistration | null {
   if (typeof token.data !== 'string') return null;
   if (token.type === 'android') return { pushToken: token.data, pushPlatform: 'fcm' };

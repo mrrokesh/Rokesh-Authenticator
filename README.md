@@ -126,7 +126,9 @@ For production: set `NODE_ENV=production` and `TRUST_PROXY=1` (or your proxy hop
 ## Tests
 
 ```bash
-cd backend && npm test       # RFC 6238 vectors, ±1 window, AES-GCM tamper, Ed25519 domain separation, recovery codes
+cd backend && npm test          # RFC 6238 vectors, ±1 window, AES-GCM tamper, Ed25519 domain separation, recovery codes
+cd frontend && npm test         # app lock, notifications card, approve/enroll/recovery screens, TOTP, device keys
+cd admin-dashboard && npm test  # session refresh, admin-only login, enrollment QR flow, device revocation
 ```
 
 End-to-end, against a running API on a **development** database (it creates throwaway employees, then locks and revokes them):

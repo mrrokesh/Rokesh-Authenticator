@@ -85,6 +85,8 @@ export interface DeviceInfo {
   deviceId: string;
   deviceName: string | null;
   enrolledAt: string;
+  pushRegistered: boolean;
+  pushPlatform: 'fcm' | 'apns' | null;
   employee: { name: string; email: string };
   unusedRecoveryCodes: number;
 }
